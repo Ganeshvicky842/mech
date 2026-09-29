@@ -1,0 +1,4 @@
+.forgot-link{display:block;width:100%;margin-top:16px;color:#536c40;font-size:12px;text-align:center}
+#admin-login-form[hidden],#admin-forgot-form[hidden]{display:none}
+#admin-forgot-form>p{font-size:12px;line-height:1.7;color:#727b72}
+#recovery-error.success{color:#385d2a;background:#edf5e4}

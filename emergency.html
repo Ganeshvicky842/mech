@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#17191b" />
+  <title>24/7 Emergency Roadside Help | Wrench &amp; Co.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="theme.css" />
+  <link rel="stylesheet" href="auto-theme.css" />
+  <link rel="stylesheet" href="emergency.css" />
+</head>
+<body class="emergency-page">
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="brand" href="index.html#home" aria-label="Wrench and Co home"><span class="brand-mark">W<span>+</span></span><span class="brand-name">WRENCH<span>&amp; CO.</span></span></a>
+      <nav class="main-nav" aria-label="Main navigation">
+        <a class="nav-link" href="index.html#home">Home</a><a class="nav-link" href="index.html#services">Services</a><a class="nav-link" href="index.html#mechanics">Our mechanics</a><a class="nav-link nav-emergency active" href="emergency.html" aria-current="page">24/7 emergency</a>
+      </nav>
+      <div class="top-actions"><a class="emergency-header-call" href="tel:+9118005550123"><span>24/7 HELPLINE</span><strong>1800 555 0123</strong></a><button class="menu-toggle" aria-label="Open navigation">☰</button></div>
+    </header>
+
+    <main>
+      <section class="emergency-hero">
+        <div class="emergency-hero-copy">
+          <div class="emergency-live"><span></span> ROADSIDE HELP · OPEN 24 HOURS</div>
+          <h1>Car trouble?<br /><em>We’re on it.</em></h1>
+          <p>Tell us where you are and what happened. We’ll help you reach the right mechanic, confirm the next step and give you an arrival estimate by phone.</p>
+          <div class="emergency-hero-actions"><a class="emergency-main-call" href="tel:+9118005550123"><span class="call-symbol">↗</span><span><small>CALL OUR 24/7 HELPLINE</small><strong>1800 555 0123</strong></span></a><a class="emergency-form-jump" href="#request-help">Send a help request <span>↓</span></a></div>
+          <div class="emergency-promise"><span>01 <strong>Quick call-back</strong></span><span>02 <strong>Clear arrival estimate</strong></span><span>03 <strong>Specialist matched to you</strong></span></div>
+        </div>
+        <div class="emergency-hero-art" aria-label="Emergency roadside help information">
+          <div class="emergency-art-orbit"></div><div class="emergency-art-number">24<span>/7</span></div>
+          <div class="emergency-status-card"><span class="status-pulse"></span><div><strong>Help starts with a call</strong><small>Talk to our team to confirm availability and arrival time.</small></div><span class="status-arrow">↗</span></div>
+          <div class="emergency-art-label"><span>WRENCH ROADSIDE</span><span>HERE WHEN IT MATTERS</span></div>
+        </div>
+      </section>
+
+      <section class="emergency-response-strip" aria-label="How emergency assistance works">
+        <div><span class="response-step">01</span><span><strong>Share your location</strong><small>Landmark or street is enough to start.</small></span></div>
+        <div><span class="response-step">02</span><span><strong>We call to confirm</strong><small>Get availability and a realistic ETA.</small></span></div>
+        <div><span class="response-step">03</span><span><strong>Meet your mechanic</strong><small>A specialist for your type of problem.</small></span></div>
+      </section>
+
+      <section class="emergency-request" id="request-help">
+        <div class="emergency-request-intro">
+          <div class="eyebrow"><span></span> REQUEST ROADSIDE ASSISTANCE</div>
+          <h2>Let’s get the<br /><em>right help moving.</em></h2>
+          <p>Describe the car’s condition and where it is. For urgent or unsafe situations, call the helpline instead of waiting for a form response.</p>
+          <div class="emergency-safety"><span>!</span><p><strong>Your safety comes first.</strong><br />Switch on hazard lights if safe, stay clear of traffic, and move to a safe place. If there is immediate danger, contact local emergency services.</p></div>
+          <div class="response-note"><span>◷</span><p><strong>On-time service, no guesswork</strong><br />We confirm an arrival estimate with you by phone before dispatch. Travel time depends on location, traffic and mechanic availability.</p></div>
+        </div>
+        <div class="emergency-form-card">
+          <form id="emergency-form">
+            <div class="emergency-form-heading"><span>QUICK HELP REQUEST</span><small>Fields marked * are required</small></div>
+            <div class="emergency-fields">
+              <label>Full name *<input name="name" autocomplete="name" placeholder="e.g. Aditi Sharma" required minlength="2" /></label>
+              <label>Mobile number *<input name="phone" type="tel" autocomplete="tel" placeholder="+91 98765 43210" required pattern="[+0-9 \(\)\-]{8,18}" /></label>
+              <label>Vehicle *<input name="vehicle" placeholder="e.g. Hyundai Creta" required /></label>
+              <label>Registration number<input name="registration" placeholder="e.g. KA 03 AB 1234" /></label>
+              <label class="emergency-field-wide">Your location *<input name="location" autocomplete="street-address" placeholder="Area, road or nearby landmark" required /></label>
+              <label>What happened? *<select name="issue" required><option value="">Choose a problem</option><option>Engine trouble</option><option>Flat tyre</option><option>Battery or starting issue</option><option>Brake problem</option><option>Overheating or coolant leak</option><option>Accident or vehicle recovery</option><option>Other problem</option></select></label>
+              <label>Preferred specialist<select name="mechanic" id="emergency-mechanic"><option value="">Match me to the right available mechanic</option><option>Arjun Singh</option><option>Priya Kumar</option><option>Ravi Varma</option><option>Neha Kulkarni</option><option>Imran Malik</option><option>Sneha Desai</option></select></label>
+              <label class="emergency-field-wide">Describe the car’s condition *<textarea name="details" rows="4" minlength="10" placeholder="Warning lights, unusual sounds, smoke, whether it can move, or any other details…" required></textarea></label>
+            </div>
+            <button class="button button-primary emergency-submit" type="submit">Send help request <span>↗</span></button>
+            <p class="emergency-form-footnote">Your request is stored for our workshop team. For immediate assistance or an arrival estimate, call <a href="tel:+9118005550123">1800 555 0123</a>.</p>
+            <div class="emergency-form-status" id="emergency-form-status" role="status" aria-live="polite" hidden></div>
+          </form>
+        </div>
+      </section>
+
+      <section class="emergency-mechanics">
+        <div><div class="eyebrow"><span></span> SKILLED PEOPLE, PRACTICAL HELP</div><h2>Not sure who to call?<br /><em>We’ll match you.</em></h2><p>Engine trouble, a flat tyre, electrical faults or a safety check — call and tell us what you’re seeing. Our team will confirm who is available and when they can reach you.</p></div>
+        <a class="button emergency-match-call" href="tel:+9118005550123">Call for a mechanic match <span>↗</span></a>
+      </section>
+    </main>
+    <footer class="footer"><a class="brand" href="index.html#home"><span class="brand-mark">W<span>+</span></span><span class="brand-name">WRENCH<span>&amp; CO.</span></span></a><p>24/7 roadside support · Arrival estimates confirmed by phone.</p><div><a href="tel:+9118005550123">1800 555 0123</a><a href="index.html#home">Back to Wrench &amp; Co. ↑</a></div></footer>
+  </div>
+  <script src="api.js"></script>
+  <script src="emergency.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+.performance-month{color:#717a71;font-size:12px;font-weight:700}
+.performance-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:16px 0}
+.performance-card{background:#fff;border:1px solid var(--line);padding:20px;min-width:0}
+.performance-card-head{display:flex;align-items:center;gap:12px;min-width:0}
+.performance-avatar{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#edf4e3;color:#587c3b;font:800 12px var(--display);flex:none}
+.performance-card-head>div:nth-child(2){min-width:0;flex:1}
+.performance-card-head h3{font:700 15px var(--display);margin:0 0 4px}
+.performance-card-head p{color:var(--muted);font-size:11px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.performance-card-head .status-pill{white-space:nowrap}
+.performance-on-shift{background:#e9f4df;color:#4e7130}
+.performance-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin:17px 0 13px;padding:13px 0}
+.performance-stats>div{min-width:0}
+.performance-stats>div+div{border-left:1px solid var(--line);padding-left:13px}
+.performance-stats span,.performance-salary>span{display:block;color:#81897f;font:700 8px var(--display);letter-spacing:.7px}
+.performance-stats strong{display:block;margin-top:7px;font:700 20px var(--display);white-space:nowrap}
+.performance-stats strong small{font-size:11px;color:var(--muted)}
+.performance-salary{display:flex;align-items:center;gap:10px}
+.performance-salary>span{flex:1}
+.performance-salary>strong{font:700 14px var(--display)}
+.performance-salary .small-action{padding:7px 9px}
+.performance-actions{display:flex;align-items:center;gap:12px;margin-top:15px}
+.performance-actions .button{padding:10px 14px;font-size:11px}
+.performance-actions .button:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.performance-actions>small{color:var(--muted);font-size:10px}
+.performance-jobs{margin-bottom:18px}
+.performance-jobs .admin-table-wrap{margin:0}
+.booking-mechanic-select{max-width:170px;min-width:120px;padding:8px;border:1px solid #dce1d8;background:#fff;color:var(--ink);font-size:11px}
+@media(max-width:900px){.performance-grid{grid-template-columns:1fr}}
+@media(max-width:520px){.performance-card{padding:15px}.performance-card-head{gap:9px}.performance-card-head .status-pill{font-size:8px;padding:5px 6px}.performance-stats>div+div{padding-left:8px}.performance-stats strong{font-size:17px}.performance-stats span,.performance-salary>span{font-size:7px}.performance-actions{align-items:flex-start;flex-direction:column;gap:8px}}
+@media(max-width:740px){.admin-sidebar .side-link:not(.active){display:flex}}

@@ -1,0 +1,17 @@
+{
+  "name": "wrench-co-workshop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Wrench & Co. website and SQLite-powered workshop API",
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.4",
+    "nodemailer": "^10.0.11"
+  }
+}
