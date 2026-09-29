@@ -1,6 +1,8 @@
 const tables = [
   { table: 'admin_credentials', collection: 'wrench_admin_credentials', primary: 'id' },
   { table: 'admin_password_resets', collection: 'wrench_admin_password_resets', primary: 'token_hash' },
+  { table: 'customers', collection: 'wrench_customers', primary: 'phone_key' },
+  { table: 'login_events', collection: 'wrench_login_events', primary: 'id' },
   { table: 'mechanics', collection: 'wrench_mechanics', primary: 'id' },
   { table: 'inventory', collection: 'wrench_inventory', primary: 'sku' },
   { table: 'bookings', collection: 'wrench_bookings', primary: 'id' },
@@ -19,6 +21,10 @@ function createMongoStore({ database, mongoDb, mongoClient }) {
   function documentsFor({ table, primary, secondary }) {
     return database.prepare(`SELECT * FROM ${table}`).all().map(row => {
       const document = Object.fromEntries(Object.entries(row));
+      if (table === 'part_orders') {
+        try { document.lines = JSON.parse(document.lines); }
+        catch { document.lines = []; }
+      }
       document._id = secondary ? `${row[primary]}:${row[secondary]}` : row[primary];
       return document;
     });
@@ -58,6 +64,14 @@ function createMongoStore({ database, mongoDb, mongoClient }) {
         for (const document of definition.documents) {
           const row = Object.fromEntries(columns.filter(column => document[column] !== undefined).map(column => [column, document[column]]));
           if (definition.table === 'mechanic_attendance') row.work_date = document.work_date;
+          if (definition.table === 'part_orders') {
+            row.lines = Array.isArray(document.lines) ? JSON.stringify(document.lines) : document.lines;
+            const phoneKey = String(document.phone || '').replace(/\D/g, '');
+            row.customer_id = document.customer_id || phoneKey || null;
+            if (phoneKey && document.name && document.phone) {
+              database.prepare('INSERT INTO customers(phone_key,name,phone) VALUES(?,?,?) ON CONFLICT(phone_key) DO NOTHING').run(phoneKey, document.name, document.phone);
+            }
+          }
           const names = Object.keys(row);
           if (!names.length) continue;
           database.prepare(`INSERT INTO ${definition.table}(${names.join(',')}) VALUES(${names.map(() => '?').join(',')})`).run(...names.map(name => row[name]));
@@ -73,6 +87,9 @@ function createMongoStore({ database, mongoDb, mongoClient }) {
   async function initialize() {
     const bookings = mongoDb.collection('wrench_bookings');
     await mongoDb.collection('wrench_mechanics').createIndex({ name: 1 }, { unique: true });
+    await mongoDb.collection('wrench_customers').createIndex({ phone_key: 1 }, { unique: true });
+    await mongoDb.collection('wrench_login_events').createIndex({ role: 1, created_at: -1 });
+    await mongoDb.collection('wrench_part_orders').createIndex({ customer_id: 1, created_at: -1 });
     await mongoDb.collection('wrench_roadside_requests').createIndex({ created_at: -1 });
     await bookings.createIndex({ date: 1, time: 1 }, {
       unique: true,

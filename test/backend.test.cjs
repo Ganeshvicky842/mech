@@ -150,9 +150,14 @@ test('persists requests and protects workshop management APIs', async () => {
   const roadsideInput = { name: 'Emergency Test', phone: '+91 90000 12345', vehicle: 'Test SUV', registration: 'KA 01 ZZ 0202', location: 'Test road', issue: 'Flat tyre', details: 'Rear tyre punctured and vehicle cannot move.', mechanic: 'Ravi Varma' };
   const roadsideResult = await call('/api/roadside-requests', { method: 'POST', headers: json, body: JSON.stringify(roadsideInput) });
   assert.equal(roadsideResult.response.status, 201);
+  const customerProfile = await call('/api/customer/login', { method: 'POST', headers: json, body: JSON.stringify({ name: 'Order Test', phone: '+91 98765 00000' }) });
+  assert.equal(customerProfile.response.status, 200);
+  assert.equal(customerProfile.body.customerId, '919876500000');
   assert.equal((await call('/api/admin/bootstrap')).response.status, 401);
   const deniedLogin = await call('/api/admin/login', { method: 'POST', headers: { ...json, Origin: 'http://untrusted.invalid' }, body: JSON.stringify({ email: adminEmail, password: adminPassword }) });
   assert.equal(deniedLogin.response.status, 403);
+  const failedLogin = await call('/api/admin/login', { method: 'POST', headers: { ...json, Origin: address }, body: JSON.stringify({ email: adminEmail, password: 'wrong-password' }) });
+  assert.equal(failedLogin.response.status, 401);
 
   const login = await call('/api/admin/login', { method: 'POST', headers: { ...json, Origin: address }, body: JSON.stringify({ email: adminEmail, password: adminPassword }) });
   assert.equal(login.response.status, 200);
@@ -160,6 +165,11 @@ test('persists requests and protects workshop management APIs', async () => {
   let bootstrap = await call('/api/admin/bootstrap', { headers: { Cookie: cookie } });
   assert.ok(bootstrap.body.bookings.some(booking => booking.id === bookingResult.body.id));
   assert.ok(bootstrap.body.roadsideRequests.some(request => request.id === roadsideResult.body.id));
+  assert.ok(bootstrap.body.customers.some(customer => customer.customerId === customerProfile.body.customerId));
+  assert.ok(bootstrap.body.loginEvents.some(event => event.role === 'customer' && event.identifier === customerProfile.body.customerId && event.success === 1));
+  assert.ok(bootstrap.body.loginEvents.some(event => event.role === 'admin' && event.success === 1));
+  assert.ok(bootstrap.body.loginEvents.some(event => event.role === 'admin' && event.success === 0));
+  assert.ok(bootstrap.body.loginEvents.every(event => !Object.hasOwn(event, 'password')));
   const assignedMechanic = bootstrap.body.mechanics.find(mechanic => mechanic.name === 'Arjun Singh');
   assert.ok(assignedMechanic);
   assert.equal(assignedMechanic.monthlySalary, 0);
@@ -198,6 +208,10 @@ test('persists requests and protects workshop management APIs', async () => {
   const partOrder = await call('/api/part-orders', { method: 'POST', headers: json, body: JSON.stringify({ name: 'Order Test', phone: '+91 98765 00000', items: [{ sku: 'OIL-5W30', quantity: 1 }] }) });
   assert.equal(partOrder.response.status, 201);
   assert.equal(partOrder.body.total, 2450);
+  bootstrap = await call('/api/admin/bootstrap', { headers: { Cookie: cookie } });
+  const savedOrder = bootstrap.body.partOrders.find(order => order.id === partOrder.body.id);
+  assert.equal(savedOrder.customerId, customerProfile.body.customerId);
+  assert.deepEqual(JSON.parse(savedOrder.lines).map(line => ({ sku: line.sku, quantity: line.quantity })), [{ sku: 'OIL-5W30', quantity: 1 }]);
   const orderUpdate = await call(`/api/admin/part-orders/${partOrder.body.id}`, { method: 'PATCH', headers: { ...json, Origin: address, Cookie: cookie }, body: JSON.stringify({ status: 'Confirmed' }) });
   assert.equal(orderUpdate.body.status, 'Confirmed');
   const cancelledOrder = await call('/api/part-orders', { method: 'POST', headers: json, body: JSON.stringify({ name: 'Cancel Test', phone: '+91 98765 00001', items: [{ sku: 'OIL-5W30', quantity: 1 }] }) });
@@ -259,6 +273,10 @@ test('persists requests and protects workshop management APIs', async () => {
   assert.equal(bootstrap.body.roadsideRequests.find(request => request.id === roadsideResult.body.id).status, 'Contacting customer');
   assert.equal(bootstrap.body.inventory.find(item => item.sku === 'OIL-5W30').qty, stockBefore + 1);
   assert.equal(bootstrap.body.partOrders.find(order => order.id === partOrder.body.id).status, 'Confirmed');
+  assert.equal(bootstrap.body.partOrders.find(order => order.id === partOrder.body.id).customerId, customerProfile.body.customerId);
+  assert.ok(bootstrap.body.customers.some(customer => customer.customerId === customerProfile.body.customerId));
+  assert.ok(bootstrap.body.loginEvents.some(event => event.role === 'customer' && event.identifier === customerProfile.body.customerId));
+  assert.ok(bootstrap.body.loginEvents.some(event => event.role === 'admin' && event.success === 1));
   assert.equal(bootstrap.body.partOrders.find(order => order.id === cancelledOrder.body.id).status, 'Cancelled');
   assert.equal(bootstrap.body.inventory.some(item => item.sku === 'TEST-PART-01'), true);
   assert.equal(bootstrap.body.offers.some(item => item.code === 'API-TEST'), true);

@@ -61,11 +61,12 @@ let mongoStore;
 let mongoRequestQueue = Promise.resolve();
 const slotOptions = ['09:00 AM', '10:00 AM', '11:30 AM', '01:00 PM', '02:00 PM', '03:30 PM', '04:30 PM', '05:30 PM'];
 const serviceNames = ['Routine service', 'Repairs & diagnostics', 'Genuine parts', 'Pick-up & delivery', 'Car care & detailing'];
+const normalizePhone = phone => phone.replace(/\D/g, '');
 const categories = ['Genuine parts', 'Accessories', 'Spare parts'];
 const bookingStatuses = ['Awaiting confirmation', 'Confirmed', 'In progress', 'Completed', 'Cancelled'];
 const roadsideStatuses = ['New', 'Contacting customer', 'Dispatched', 'Completed', 'Cancelled'];
 const contentTypes = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.jsx': 'text/babel; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.ico': 'image/x-icon' };
-const publicFiles = new Set(['index.html', 'emergency.html', 'styles.css', 'mechanic-performance.css', 'catalog.css', 'theme.css', 'auto-theme.css', 'emergency.css', 'recovery.css', 'reset-password.css', 'app.js', 'api.js', 'catalog.jsx', 'emergency.js', 'reset-password.js', 'assets/mechanic-at-work.jpg']);
+const publicFiles = new Set(['index.html', 'emergency.html', 'styles.css', 'mechanic-performance.css', 'catalog.css', 'theme.css', 'auto-theme.css', 'emergency.css', 'recovery.css', 'reset-password.css', 'app.js', 'api.js', 'catalog.jsx', 'customer-auth.js', 'emergency.js', 'reset-password.js', 'assets/mechanic-at-work.jpg']);
 const products = [
   ['OIL-5W30', 'Synthetic engine oil · 5W-30', 'Genuine parts', 'Mobil 1', 24, 8, 1800, 2450],
   ['FLT-OEM-01', 'OEM oil filter · Universal', 'Genuine parts', 'Bosch', 18, 10, 280, 420],
@@ -169,8 +170,16 @@ database.exec(`
     when_text TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1
   );
   CREATE TABLE IF NOT EXISTS part_orders (
-    id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL, lines TEXT NOT NULL,
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL, customer_id TEXT, lines TEXT NOT NULL,
     total REAL NOT NULL, status TEXT NOT NULL DEFAULT 'Requested', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS customers (
+    phone_key TEXT PRIMARY KEY, name TEXT NOT NULL, phone TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, last_login_at TEXT
+  );
+  CREATE TABLE IF NOT EXISTS login_events (
+    id TEXT PRIMARY KEY, role TEXT NOT NULL CHECK(role IN ('admin','customer')),
+    identifier TEXT NOT NULL, success INTEGER NOT NULL CHECK(success IN (0,1)), created_at TEXT NOT NULL
   );
   CREATE INDEX IF NOT EXISTS bookings_date_index ON bookings(date, time);
   CREATE UNIQUE INDEX IF NOT EXISTS active_booking_slot_index ON bookings(date,time) WHERE status!='Cancelled';
@@ -178,6 +187,15 @@ database.exec(`
 `);
 if (!database.prepare('PRAGMA table_info(bookings)').all().some(column => column.name === 'mechanic_id')) {
   database.exec('ALTER TABLE bookings ADD COLUMN mechanic_id INTEGER REFERENCES mechanics(id)');
+}
+if (!database.prepare('PRAGMA table_info(part_orders)').all().some(column => column.name === 'customer_id')) {
+  database.exec('ALTER TABLE part_orders ADD COLUMN customer_id TEXT');
+}
+for (const order of database.prepare('SELECT id,name,phone FROM part_orders WHERE customer_id IS NULL').all()) {
+  const phoneKey = normalizePhone(order.phone);
+  if (!phoneKey) continue;
+  database.prepare('INSERT INTO customers(phone_key,name,phone) VALUES(?,?,?) ON CONFLICT(phone_key) DO NOTHING').run(phoneKey, order.name, order.phone);
+  database.prepare('UPDATE part_orders SET customer_id=? WHERE id=?').run(phoneKey, order.id);
 }
 
 if (!database.prepare('SELECT 1 FROM admin_credentials WHERE id=1').get() && adminPassword) {
@@ -326,6 +344,11 @@ function requestView(row) {
 function inventoryView(row) {
   return { sku: row.sku, name: row.name, category: row.category, brand: row.brand, qty: row.qty, min: row.min, cost: row.cost, price: row.price };
 }
+function recordLoginEvent(role, identifier, success) {
+  const id = `LOGIN-${randomBytes(8).toString('hex').toUpperCase()}`;
+  database.prepare('INSERT INTO login_events(id,role,identifier,success,created_at) VALUES(?,?,?,?,?)')
+    .run(id, role, identifier, success ? 1 : 0, new Date().toISOString());
+}
 function adminBootstrap() {
   return {
     bookings: database.prepare('SELECT bookings.*, mechanics.name AS mechanic_name FROM bookings LEFT JOIN mechanics ON mechanics.id=bookings.mechanic_id ORDER BY date DESC,time DESC').all().map(bookingView),
@@ -336,7 +359,9 @@ function adminBootstrap() {
     invoices: database.prepare('SELECT id,customer,description AS desc,amount,due,status FROM invoices ORDER BY due DESC').all(),
     transactions: database.prepare('SELECT id,type,party,detail,amount,date FROM transactions ORDER BY date DESC,id DESC').all(),
     offers: database.prepare('SELECT tag,title,description AS desc,when_text AS \"when\",code,active FROM offers ORDER BY rowid DESC').all(),
-    partOrders: database.prepare('SELECT id,name,phone,lines,total,status,created_at AS createdAt FROM part_orders ORDER BY created_at DESC').all()
+    partOrders: database.prepare('SELECT id,name,phone,customer_id AS customerId,lines,total,status,created_at AS createdAt FROM part_orders ORDER BY created_at DESC').all(),
+    customers: database.prepare('SELECT phone_key AS customerId,name,phone,created_at AS createdAt,last_login_at AS lastLoginAt FROM customers ORDER BY last_login_at DESC,created_at DESC').all(),
+    loginEvents: database.prepare('SELECT id,role,identifier,success,created_at AS createdAt FROM login_events ORDER BY created_at DESC LIMIT 200').all()
   };
 }
 function insertTransaction(type, party, detail, amount) {
@@ -364,6 +389,19 @@ async function handleApi(request, response, url) {
     const date = url.searchParams.get('date') || '';
     if (!validDate(date) || date < currentIsoDate()) return fail(response, 400, 'Choose a valid date today or later.');
     sendJson(response, 200, { date, slots: todayAvailable(date) });
+    return;
+  }
+  if (method === 'POST' && pathname === '/api/customer/login') {
+    const body = await readBody(request);
+    const fieldError = requiredFields(body, { name: 2, phone: 8 });
+    if (fieldError) return fail(response, 400, fieldError);
+    if (!validPhone(body.phone)) return fail(response, 400, 'Enter a valid phone number.');
+    const phone = body.phone.trim();
+    const phoneKey = normalizePhone(phone);
+    const name = body.name.trim();
+    database.prepare('INSERT INTO customers(phone_key,name,phone,last_login_at) VALUES(?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(phone_key) DO UPDATE SET name=excluded.name,phone=excluded.phone,last_login_at=CURRENT_TIMESTAMP').run(phoneKey, name, phone);
+    recordLoginEvent('customer', phoneKey, true);
+    sendJson(response, 200, { customerId: phoneKey, name, phone });
     return;
   }
   if (method === 'POST' && pathname === '/api/bookings') {
@@ -426,8 +464,10 @@ async function handleApi(request, response, url) {
         const changed = database.prepare('UPDATE inventory SET qty=qty-? WHERE sku=? AND qty>=?').run(line.quantity, line.sku, line.quantity);
         if (changed.changes !== 1) throw new Error(`Not enough stock for ${line.name}.`);
       }
-      database.prepare('INSERT INTO part_orders(id,name,phone,lines,total) VALUES(?,?,?,?,?)')
-        .run(id, body.name.trim(), body.phone.trim(), JSON.stringify(lines), total);
+      const phoneKey = normalizePhone(body.phone);
+      database.prepare('INSERT INTO customers(phone_key,name,phone) VALUES(?,?,?) ON CONFLICT(phone_key) DO UPDATE SET name=excluded.name,phone=excluded.phone').run(phoneKey, body.name.trim(), body.phone.trim());
+      database.prepare('INSERT INTO part_orders(id,name,phone,customer_id,lines,total) VALUES(?,?,?,?,?,?)')
+        .run(id, body.name.trim(), body.phone.trim(), phoneKey, JSON.stringify(lines), total);
       database.exec('COMMIT');
     } catch (error) {
       database.exec('ROLLBACK');
@@ -446,12 +486,14 @@ async function handleApi(request, response, url) {
     const suppliedPassword = typeof body.password === 'string' ? body.password : '';
     const emailMatches = clean(body.email).toLowerCase() === adminEmail;
     if (!emailMatches || !passwordMatches(suppliedPassword)) {
+      recordLoginEvent('admin', clean(body.email).toLowerCase() || 'unknown', false);
       attempts.count += 1;
       if (attempts.count >= 5) { attempts.count = 0; attempts.blockedUntil = Date.now() + 5 * 60 * 1000; }
       loginAttempts.set(ip, attempts);
       return fail(response, attempts.blockedUntil ? 429 : 401, 'Email or password is incorrect.');
     }
     loginAttempts.delete(ip);
+    recordLoginEvent('admin', adminEmail, true);
     const token = randomBytes(32).toString('hex');
     sessions.set(token, { email: adminEmail, expiresAt: Date.now() + sessionDuration });
     const cookie = `wrench_admin_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionDuration / 1000}${secureRequest(request) ? '; Secure' : ''}`;
