@@ -23,6 +23,12 @@ npm start
 
 For a production deployment, set `NODE_ENV=production`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `HOST=0.0.0.0`, and place the server behind an HTTPS reverse proxy. Production startup refuses to use the demo administrator account. Admin sessions are HTTP-only, same-site cookies and expire after eight hours. Back up the `.data` directory while the server is stopped.
 
+## Publish on Render
+
+The `render.yaml` Blueprint deploys the website and API together at one public URL. It stores SQLite at `/var/data/wrench.sqlite` on a persistent 1 GB disk, so bookings survive restarts and deploys. The configured `0.5c-512mb` web plan and persistent disk are paid Render resources; review the current price before creating the service.
+
+In Render, create a new Blueprint from `Ganeshvicky842/mech`, then provide `ADMIN_EMAIL` and a private `ADMIN_PASSWORD` when prompted. Do not use the local demo credentials in production. After deployment, the Render URL serves both the frontend and `/api/*`. To enable password recovery, add the HTTPS service URL as `APP_BASE_URL` and configure `ADMIN_RECOVERY_EMAIL`, `SMTP_USER`, `SMTP_APP_PASSWORD`, and any required SMTP settings in the service environment.
+
 ## Administrator password recovery
 
 The administrator sign-in screen includes **Forgot password?**. Recovery links are sent to `ramollarakesh143@gmail.com` by default (override with `ADMIN_RECOVERY_EMAIL`). Configure Gmail SMTP and the public HTTPS site URL in the server's private `.env` file:
