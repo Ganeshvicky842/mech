@@ -3,8 +3,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createHash, randomBytes, scryptSync, timingSafeEqual } = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const { MongoClient } = require('mongodb');
 const nodemailer = require('nodemailer');
 const applySecurityHeaders = require('./middleware/security.cjs');
+const { createMongoStore } = require('./mongo-store.cjs');
 
 const root = __dirname;
 require('dotenv').config({ path: path.join(root, '.env') });
@@ -12,6 +14,25 @@ const dataDir = path.resolve(process.env.WRENCH_DATA_DIR || path.join(root, '.da
 const databasePath = path.resolve(root, process.env.DATABASE_PATH || path.join(dataDir, 'wrench.sqlite'));
 fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 const database = new DatabaseSync(databasePath);
+const mongoEnabled = process.env.DATABASE_BACKEND !== 'sqlite';
+if (mongoEnabled && !process.env.MONGO_URL) throw new Error('Set MONGO_URL in .env or set DATABASE_BACKEND=sqlite for local-only use.');
+let databaseDirty = false;
+const originalPrepare = database.prepare.bind(database);
+database.prepare = sql => {
+  const statement = originalPrepare(sql);
+  const mutatesData = /^\s*(INSERT|UPDATE|DELETE|REPLACE)\b/i.test(sql);
+  return new Proxy(statement, {
+    get(target, property) {
+      if (property === 'run') return (...params) => {
+        const result = target.run(...params);
+        if (mutatesData && result.changes) databaseDirty = true;
+        return result;
+      };
+      const value = Reflect.get(target, property, target);
+      return typeof value === 'function' ? value.bind(target) : value;
+    }
+  });
+};
 database.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
 const port = Number(process.env.PORT || 8000);
 const host = process.env.HOST || '127.0.0.1';
@@ -35,6 +56,9 @@ const sessions = new Map();
 const loginAttempts = new Map();
 const recoveryAttempts = new Map();
 const sessionDuration = 8 * 60 * 60 * 1000;
+let mongoClient;
+let mongoStore;
+let mongoRequestQueue = Promise.resolve();
 const slotOptions = ['09:00 AM', '10:00 AM', '11:30 AM', '01:00 PM', '02:00 PM', '03:30 PM', '04:30 PM', '05:30 PM'];
 const serviceNames = ['Routine service', 'Repairs & diagnostics', 'Genuine parts', 'Pick-up & delivery', 'Car care & detailing'];
 const categories = ['Genuine parts', 'Accessories', 'Spare parts'];
@@ -737,12 +761,43 @@ async function handleApi(request, response, url) {
   return fail(response, 404, 'API route not found.');
 }
 
+async function handleMongoApi(request, response, url) {
+  const writeHead = response.writeHead.bind(response);
+  const end = response.end.bind(response);
+  let responseHead;
+  let responseBody;
+  response.writeHead = (...args) => { responseHead = args; return response; };
+  response.end = (...args) => { responseBody = args; return response; };
+  try {
+    await handleApi(request, response, url);
+    if (databaseDirty) {
+      await mongoStore.persist();
+      databaseDirty = false;
+    }
+    if (responseHead) writeHead(...responseHead);
+    end(...(responseBody || []));
+  } catch (error) {
+    if (response.headersSent || response.destroyed) return;
+    const status = error.status || 503;
+    const message = error.status ? error.message : 'The database could not save this request. Please try again.';
+    writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    end(JSON.stringify({ error: message }));
+  }
+}
+
+function enqueueMongoApi(request, response, url) {
+  const operation = mongoRequestQueue.then(() => handleMongoApi(request, response, url));
+  mongoRequestQueue = operation.catch(() => {});
+  return operation;
+}
+
 const server = http.createServer(async (request, response) => {
   applySecurityHeaders(request, response);
   try {
     const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
     if (url.pathname.startsWith('/api/')) {
-      await handleApi(request, response, url);
+      if (mongoEnabled) await enqueueMongoApi(request, response, url);
+      else await handleApi(request, response, url);
       return;
     }
     if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -777,5 +832,28 @@ const server = http.createServer(async (request, response) => {
     fail(response, error.status || 500, error.status ? error.message : 'An internal server error occurred.');
   }
 });
-server.listen(port, host, () => console.log(`Wrench & Co. is running at http://${host}:${port}`));
-server.on('close', () => database.close());
+
+async function startServer() {
+  if (mongoEnabled) {
+    mongoClient = new MongoClient(process.env.MONGO_URL);
+    await mongoClient.connect();
+    const uriDatabase = decodeURIComponent(new URL(process.env.MONGO_URL).pathname.replace(/^\/+/, ''));
+    const mongoDb = mongoClient.db(process.env.MONGO_DB_NAME || uriDatabase || 'wrench');
+    mongoStore = createMongoStore({ database, mongoDb, mongoClient });
+    const storageState = await mongoStore.initialize();
+    databaseDirty = false;
+    console.log(`MongoDB connected; workshop records ${storageState === 'migrated' ? 'migrated from SQLite' : 'loaded'}.`);
+  }
+  server.listen(port, host, () => console.log(`Wrench & Co. is running at http://${host}:${port}`));
+}
+
+startServer().catch(async error => {
+  console.error(`Backend startup failed: ${error.codeName || error.name}. Check MONGO_URL and the MongoDB user permissions.`);
+  database.close();
+  await mongoClient?.close().catch(() => {});
+  process.exitCode = 1;
+});
+server.on('close', () => {
+  database.close();
+  void mongoClient?.close();
+});

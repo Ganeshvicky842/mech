@@ -2,16 +2,16 @@
 
 ## Run locally
 
-Use Node.js 22.13 or newer. The API uses Node's built-in SQLite module. Copy `.env.example` to `.env`, set a private administrator password, and install the SMTP and environment-variable dependencies before starting the server.
+Use Node.js 22.13 or newer. Copy `.env.example` to `.env`, set a MongoDB connection string and private administrator password, then install dependencies before starting the server. Keep `.env` private and never commit it.
 
 ```powershell
 npm install
 npm start
 ```
 
-Open `http://127.0.0.1:8000`. The first local run creates `.data/wrench.sqlite` and seeds the workshop catalogue, mechanics, example appointments, invoices, offers and transactions. In production, the database starts without demo appointments, invoices, offers or transactions; catalogue and mechanic starter data are still seeded.
+Open `http://127.0.0.1:8000`. MongoDB is the durable store. On first connection, existing records from `.data/wrench.sqlite` are copied into MongoDB only when the workshop collections are empty; on later starts MongoDB data is loaded into the local SQLite working copy. Successful API writes are committed to MongoDB before the response is sent. The service serializes API requests and is intended to run as one instance.
 
-The local demo administrator is `admin@wrenchco.in` / `wrench123` when `ADMIN_PASSWORD` is not set. Set a private password before sharing the site. The server listens on `127.0.0.1` by default. `DATABASE_PATH` selects the SQLite file; it defaults to `.data/wrench.sqlite` and its parent directory is created automatically. `WRENCH_DATA_DIR` remains supported as a legacy directory override.
+The local demo administrator is `admin@wrenchco.in` / `wrench123` when `ADMIN_PASSWORD` is not set. Set a private password before sharing the site. The server listens on `127.0.0.1` by default. `MONGO_URL` is required unless `DATABASE_BACKEND=sqlite` is explicitly selected for isolated tests. `MONGO_DB_NAME` optionally overrides the database name in the URI. `DATABASE_PATH` selects the local SQLite working copy, defaulting to `.data/wrench.sqlite`.
 
 ```powershell
 $env:ADMIN_EMAIL = "workshop@example.com"
@@ -21,13 +21,13 @@ $env:PORT = "8000"
 npm start
 ```
 
-For a production deployment, set `NODE_ENV=production`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `HOST=0.0.0.0`, and place the server behind an HTTPS reverse proxy. Production startup refuses to use the demo administrator account. Admin sessions are HTTP-only, same-site cookies and expire after eight hours. Back up the `.data` directory while the server is stopped.
+For a production deployment, set `NODE_ENV=production`, `MONGO_URL`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`, and `HOST=0.0.0.0`, and place the server behind an HTTPS reverse proxy. Production startup refuses to use the demo administrator account. Admin sessions are HTTP-only, same-site cookies and expire after eight hours. Back up MongoDB; the local SQLite file is a working copy, not the production backup.
 
 ## Publish on Render
 
-The `render.yaml` Blueprint deploys the website and API together at one public URL. It stores SQLite at `/var/data/wrench.sqlite` on a persistent 1 GB disk, so bookings survive restarts and deploys. The configured `0.5c-512mb` web plan and persistent disk are paid Render resources; review the current price before creating the service.
+The `render.yaml` Blueprint deploys the website and API together at one public URL and connects to MongoDB. It prompts for the private `MONGO_URL`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD`. The Blueprint uses Render's free web plan; its local SQLite working copy is rebuilt from MongoDB on restarts, so MongoDB must be reachable and retain your records.
 
-In Render, create a new Blueprint from `Ganeshvicky842/mech`, then provide `ADMIN_EMAIL` and a private `ADMIN_PASSWORD` when prompted. Do not use the local demo credentials in production. After deployment, the Render URL serves both the frontend and `/api/*`. To enable password recovery, add the HTTPS service URL as `APP_BASE_URL` and configure `ADMIN_RECOVERY_EMAIL`, `SMTP_USER`, `SMTP_APP_PASSWORD`, and any required SMTP settings in the service environment.
+In Render, create a new Blueprint from `Ganeshvicky842/mech`, then provide the MongoDB URI and private admin credentials when prompted. Do not use the local demo credentials in production. After deployment, the Render URL serves both the frontend and `/api/*`. To enable password recovery, add the HTTPS service URL as `APP_BASE_URL` and configure `ADMIN_RECOVERY_EMAIL`, `SMTP_USER`, `SMTP_APP_PASSWORD`, and any required SMTP settings in the service environment.
 
 ## Administrator password recovery
 

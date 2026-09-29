@@ -32,7 +32,7 @@ async function startServer() {
   port = await unusedPort();
   serverProcess = spawn(process.execPath, [path.join(root, 'server.cjs')], {
     cwd: root,
-    env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', DATABASE_PATH: path.join(dataDir, 'wrench.sqlite'), ADMIN_EMAIL: adminEmail, ADMIN_PASSWORD: adminPassword, ADMIN_RECOVERY_EMAIL: 'recovery@example.com', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(smtpPort), SMTP_SECURE: 'false', SMTP_USER: 'smtp-user@example.com', SMTP_APP_PASSWORD: 'test-only-smtp-password', APP_BASE_URL: `http://127.0.0.1:${port}`, NODE_ENV: 'test' },
+    env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', DATABASE_BACKEND: 'sqlite', DATABASE_PATH: path.join(dataDir, 'wrench.sqlite'), ADMIN_EMAIL: adminEmail, ADMIN_PASSWORD: adminPassword, ADMIN_RECOVERY_EMAIL: 'recovery@example.com', SMTP_HOST: '127.0.0.1', SMTP_PORT: String(smtpPort), SMTP_SECURE: 'false', SMTP_USER: 'smtp-user@example.com', SMTP_APP_PASSWORD: 'test-only-smtp-password', APP_BASE_URL: `http://127.0.0.1:${port}`, NODE_ENV: 'test' },
     stdio: 'ignore'
   });
   const address = `http://127.0.0.1:${port}`;

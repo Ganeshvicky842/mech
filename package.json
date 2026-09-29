@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "dotenv": "^18.0.4",
+    "mongodb": "^7.7.0",
     "nodemailer": "^10.0.11"
   }
 }
